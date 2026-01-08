@@ -40,6 +40,7 @@ chmod +x install.sh
 
 # Запустите программу
 python main.py
+```
 🔧 Установка FFmpeg (обязательно)
 Программа использует FFmpeg для конвертации видео. Установите его:
 
@@ -53,7 +54,7 @@ Windows
 Перезагрузите компьютер
 
 Linux (Ubuntu/Debian)
-bash
+```bash
 sudo apt update
 sudo apt install ffmpeg
 macOS
@@ -62,14 +63,16 @@ brew install ffmpeg
 Проверка установки FFmpeg
 bash
 ffmpeg -version
+```
 🖥️ Использование
 Графический интерфейс (рекомендуется)
-bash
+```bash
 python main.py
+```
 или просто запустите launch.bat (Windows)
 
 Командная строка
-bash
+```bash
 # Базовое использование
 python discord_gif_converter.py video.mp4
 
@@ -81,9 +84,11 @@ python discord_gif_converter.py video.mp4 -s 5 -e 15
 
 # Пакетная конвертация всех MP4 в папке
 python discord_gif_converter.py ./videos/ -b
+```
 Быстрая конвертация
-bash
+```bash
 python quick_convert.py
+```
 ⚙️ Параметры командной строки
 Параметр	Описание	Пример	По умолчанию
 -o, --output	Выходной файл	-o meme.gif	автоимя
@@ -121,14 +126,15 @@ discord-gif-converter/
 Перезагрузите компьютер после добавления в PATH
 
 ❌ "NumPy ошибка"
-bash
+```bash
 pip uninstall numpy -y
 pip install numpy==1.24.3
+```
 ❌ "tkinterdnd2 не устанавливается"
-bash
+```bash
 # Способ 1: Стандартная установка
 pip install tkinterdnd2
-
+```
 # Способ 2: Без drag&drop (ограниченный функционал)
 # Отредактируйте gui_converter.py, закомментировав импорт tkinterdnd2
 ❌ "AttributeError: _ARRAY_API not found"
@@ -179,16 +185,19 @@ tkinterdnd2 - поддержка drag & drop
 
 Создайте ветку для вашей функции:
 
-bash
+```bash
 git checkout -b feature/amazing-feature
+```
 Зафиксируйте изменения:
 
-bash
+```bash
 git commit -m 'Добавил крутую функцию'
+```
 Запушьте ветку:
 
-bash
+```bash
 git push origin feature/amazing-feature
+```
 Создайте Pull Request
 
 📄 Лицензия
