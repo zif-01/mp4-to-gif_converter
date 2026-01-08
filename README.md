@@ -34,7 +34,7 @@ cat > README.md << 'EOF'
 3. **Запустите программу** через `launch.bat`
 
 #### Для Linux/macOS
-\`\`\`bash
+```bash
 # Клонируйте репозиторий
 git clone https://github.com/ваш_username/discord-gif-converter.git
 cd discord-gif-converter
@@ -45,8 +45,7 @@ chmod +x install.sh
 
 # Запустите программу
 python main.py
-\`\`\`
-
+```
 ### 🔧 Установка FFmpeg (обязательно)
 
 Программа использует FFmpeg для конвертации видео. Установите его:
@@ -58,31 +57,31 @@ python main.py
 4. Перезагрузите компьютер
 
 #### Linux (Ubuntu/Debian)
-\`\`\`bash
+```bash
 sudo apt update
 sudo apt install ffmpeg
-\`\`\`
+```
 
 #### macOS
-\`\`\`bash
+```bash
 brew install ffmpeg
-\`\`\`
+```
 
 #### Проверка установки FFmpeg
-\`\`\`bash
+```bash
 ffmpeg -version
-\`\`\`
+```
 
 ## 🖥️ Использование
 
 ### Графический интерфейс (рекомендуется)
-\`\`\`bash
+```bash
 python main.py
-\`\`\`
+```
 или просто запустите \`launch.bat\` (Windows)
 
 ### Командная строка
-\`\`\`bash
+```bash
 # Базовое использование
 python discord_gif_converter.py video.mp4
 
@@ -94,12 +93,12 @@ python discord_gif_converter.py video.mp4 -s 5 -e 15
 
 # Пакетная конвертация всех MP4 в папке
 python discord_gif_converter.py ./videos/ -b
-\`\`\`
+```
 
 ### Быстрая конвертация
-\`\`\`bash
+```bash
 python quick_convert.py
-\`\`\`
+```
 
 ## ⚙️ Параметры командной строки
 
@@ -140,33 +139,33 @@ python quick_convert.py
 ## 🐛 Устранение неполадок
 
 ### ❌ "FFmpeg не найден"
-1. Убедитесь, что FFmpeg установлен: \`ffmpeg -version\`
-2. Проверьте наличие в PATH: \`where ffmpeg\` (Windows) или \`which ffmpeg\` (Linux/macOS)
+1. Убедитесь, что FFmpeg установлен: `ffmpeg -version`
+2. Проверьте наличие в PATH: `where ffmpeg` (Windows) или `which ffmpeg` (Linux/macOS)
 3. Перезагрузите компьютер после добавления в PATH
 
 ### ❌ "NumPy ошибка"
-\`\`\`bash
+```bash
 pip uninstall numpy -y
 pip install numpy==1.24.3
-\`\`\`
+```
 
 ### ❌ "tkinterdnd2 не устанавливается"
-\`\`\`bash
+```bash
 # Способ 1: Стандартная установка
 pip install tkinterdnd2
 
 # Способ 2: Без drag&drop (ограниченный функционал)
 # Отредактируйте gui_converter.py, закомментировав импорт tkinterdnd2
-\`\`\`
+```
 
 ### ❌ "AttributeError: _ARRAY_API not found"
-\`\`\`bash
+```bash
 # Проблема несовместимости NumPy 2.x
 pip install numpy==1.24.3
-\`\`\`
+```
 
 ### ❌ Программа зависает при конвертации
-1. Убедитесь, что FFmpeg работает: \`ffmpeg -version\`
+1. Убедитесь, что FFmpeg работает: `ffmpeg -version`
 2. Проверьте права на запись в папку вывода
 3. Попробуйте уменьшить разрешение или FPS
 
@@ -197,31 +196,31 @@ pip install numpy==1.24.3
 
 1. **Форкните** репозиторий
 2. **Создайте ветку** для вашей функции:
-   \`\`\`bash
+   ```bash
    git checkout -b feature/amazing-feature
-   \`\`\`
+   ```
 3. **Зафиксируйте изменения**:
-   \`\`\`bash
+   ```bash
    git commit -m 'Добавил крутую функцию'
-   \`\`\`
+   ```
 4. **Запушьте ветку**:
-   \`\`\`bash
+   ```bash
    git push origin feature/amazing-feature
-   \`\`\`
+   ```
 5. **Создайте Pull Request**
 
 ## 📄 Лицензия
 
 Этот проект распространяется под лицензией **MIT**. Подробнее в файле [LICENSE](LICENSE).
 
-\`\`\`
+```
 MIT License
 
 Copyright (c) 2024 [Ваше Имя]
 
 Разрешается свободное использование, копирование, изменение, объединение, публикация, 
 распределение, сублицензирование и/или продажа копий программного обеспечения.
-\`\`\`
+```
 
 ## 👨‍💻 Автор
 
