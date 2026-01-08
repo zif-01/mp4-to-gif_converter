@@ -1,0 +1,8 @@
+# Используем стабильные версии, совместимые с NumPy 1.x
+numpy==1.24.3  # Фиксируем версию NumPy 1.x
+moviepy==1.0.3
+pillow==10.2.0
+opencv-python-headless==4.8.1.78  # Используем headless версию
+imageio==2.31.6
+imageio-ffmpeg==0.4.9
+tkinterdnd2==0.3.0  # Для drag & drop
