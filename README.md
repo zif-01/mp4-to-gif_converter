@@ -123,18 +123,19 @@ python quick_convert.py
 
 ## 📁 Структура проекта
 
-discord-gif-converter/
-├── 📄 main.py                 # Главный запускающий файл
-├── 📄 discord_gif_converter.py # Основной конвертер (CLI)
-├── 📄 gui_converter.py        # Графический интерфейс
-├── 📄 quick_convert.py        # Быстрая конвертация
-├── 📄 requirements.txt        # Зависимости Python
-├── 📄 setup.bat              # Установщик для Windows
-├── 📄 install.sh             # Установщик для Linux/macOS
-├── 📄 README.md              # Эта документация
-├── 📄 LICENSE                # Лицензия MIT
-├── 📄 .gitignore             # Игнорируемые файлы
-└── 📁 screenshots/           # Скриншоты программы
+| Файл/Папка | Назначение |
+|------------|------------|
+| `main.py` | Главный запускающий файл |
+| `discord_gif_converter.py` | Основной конвертер (CLI) |
+| `gui_converter.py` | Графический интерфейс |
+| `quick_convert.py` | Быстрая конвертация |
+| `requirements.txt` | Зависимости Python |
+| `setup.bat` | Установщик для Windows |
+| `install.sh` | Установщик для Linux/macOS |
+| `README.md` | Документация |
+| `LICENSE` | Лицензия MIT |
+| `.gitignore` | Игнорируемые файлы Git |
+| `screenshots/` | Скриншоты программы |
 
 ## 🐛 Устранение неполадок
 
