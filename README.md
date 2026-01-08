@@ -123,7 +123,6 @@ python quick_convert.py
 
 ## 📁 Структура проекта
 
-\`\`\`
 discord-gif-converter/
 ├── 📄 main.py                 # Главный запускающий файл
 ├── 📄 discord_gif_converter.py # Основной конвертер (CLI)
@@ -136,7 +135,6 @@ discord-gif-converter/
 ├── 📄 LICENSE                # Лицензия MIT
 ├── 📄 .gitignore             # Игнорируемые файлы
 └── 📁 screenshots/           # Скриншоты программы
-\`\`\`
 
 ## 🐛 Устранение неполадок
 
