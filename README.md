@@ -1,7 +1,3 @@
-# Удалите старый README.md если он есть
-del README.md 2>nul
-
-# Создайте новый файл с исправленным форматированием
 cat > README.md << 'EOF'
 # 🎮 Discord GIF Converter
 
