@@ -25,9 +25,9 @@ class DiscordGIFConverter:
         """
         self.optimize_level = optimize_level
         self.presets = {
-            0: {'fps': 15, 'width': 640, 'colors': 256, 'quality': 90},
-            1: {'fps': 10, 'width': 480, 'colors': 128, 'quality': 80},
-            2: {'fps': 8, 'width': 400, 'colors': 64, 'quality': 70}
+            0: {'fps': 24, 'width': 800, 'colors': 256, 'quality': 95, 'dither': 'floydsteinberg'},  # Highest quality
+            1: {'fps': 15, 'width': 640, 'colors': 192, 'quality': 85, 'dither': 'sierra2'},       # Balanced
+            2: {'fps': 10, 'width': 480, 'colors': 128, 'quality': 80, 'dither': 'none'}          # Discord-optimized
         }
         
         # Проверка наличия ffmpeg
@@ -175,13 +175,26 @@ class DiscordGIFConverter:
             # Получение настроек
             preset = self._get_preset()
             fps = custom_fps or preset['fps']
-            width = custom_width or preset['width']
-            
+
+            # Автоматическое определение ширины на основе входного файла
+            if custom_width:
+                width = custom_width
+            else:
+                # Используем ширину из пресета как максимальную ширину
+                preset_width = preset['width']
+                input_width = video_info['width']
+
+                # Если входное видео меньше пресета, используем его ширину
+                if input_width > 0 and input_width < preset_width:
+                    width = input_width
+                else:
+                    width = preset_width
+
             print(f"⚙️  Настройки конвертации:")
             print(f"   • Длительность: {duration:.1f} сек")
             print(f"   • Исходный FPS: {video_info['fps']:.1f}")
             print(f"   • Целевой FPS: {fps}")
-            print(f"   • Ширина: {width}px")
+            print(f"   • Ширина: {width}px (автоопределение)")
             
             # Построение команды ffmpeg
             cmd = [self.ffmpeg_path, '-y']
@@ -235,10 +248,12 @@ class DiscordGIFConverter:
                 # Пробуем без палитры
                 cmd.append(output_path)
             else:
-                # Использование палитры
+                # Использование палитры с улучшенным дизерингом
+                preset = self._get_preset()
+                dither_method = preset.get('dither', 'floydsteinberg')
                 cmd.extend([
                     '-i', palette_path,
-                    '-filter_complex', f'[0:v]fps={fps},scale={width}:-1:flags=lanczos[x];[x][1:v]paletteuse=dither=sierra2_4a',
+                    '-filter_complex', f'[0:v]fps={fps},scale={width}:-1:flags=lanczos[x];[x][1:v]paletteuse=dither={dither_method}',
                     output_path
                 ])
             

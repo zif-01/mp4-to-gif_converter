@@ -28,7 +28,6 @@ class DiscordGIFConverterGUI:
         self.input_files = []
         self.output_folder = tk.StringVar(value=os.getcwd())
         self.fps = tk.IntVar(value=10)
-        self.width = tk.IntVar(value=400)
         self.optimize_level = tk.IntVar(value=2)
         self.trim_start = tk.StringVar(value="0:00")
         self.trim_end = tk.StringVar()
@@ -59,28 +58,34 @@ class DiscordGIFConverterGUI:
         # Современная тема
         style.theme_use('clam')
         
-        # Цвета
-        self.bg_color = "#2b2b2b"
-        self.fg_color = "#ffffff"
-        self.accent_color = "#7289da"  # Discord цвет
-        self.success_color = "#43b581"
-        self.error_color = "#f04747"
-        self.warning_color = "#faa61a"
+        # Цвета - улучшенная гармоничная палитра
+        self.bg_color = "#1e1e1e"        # Более темный фон
+        self.fg_color = "#e0e0e0"        # Светлый текст
+        self.text_muted = "#a0a0a0"      # Приглушенный текст
+        self.accent_color = "#5e8cff"    # Современный синий акцент
+        self.success_color = "#4caf50"   # Современный зеленый
+        self.error_color = "#f44336"     # Современный красный
+        self.warning_color = "#ff9800"   # Современный оранжевый
+        self.border_color = "#333333"    # Цвет границ
         
         # Настройка цветов
         self.root.configure(bg=self.bg_color)
-        
+
         # Стили для виджетов
         style.configure("TLabel", background=self.bg_color, foreground=self.fg_color)
         style.configure("TButton", padding=6)
         style.configure("Accent.TButton", background=self.accent_color, foreground="white")
         style.configure("Success.TButton", background=self.success_color, foreground="white")
         style.configure("Warning.TButton", background=self.warning_color, foreground="white")
-        
+
         # Стиль для прогресс-бара
         style.configure("Custom.Horizontal.TProgressbar",
                        background=self.accent_color,
-                       troughcolor="#404040")
+                       troughcolor=self.border_color)
+
+        # Стиль для фреймов
+        style.configure("TLabelframe", background=self.bg_color, foreground=self.fg_color)
+        style.configure("TLabelframe.Label", background=self.bg_color, foreground=self.fg_color)
     
     def create_widgets(self):
         """Создание всех виджетов интерфейса"""
@@ -227,36 +232,20 @@ class DiscordGIFConverterGUI:
                                activeforeground=self.fg_color)
             rb.pack(anchor=tk.W)
         
-        # Разрешение (ширина)
+        # Разрешение (автоматически определяется)
         row += 1
         ttk.Label(settings_grid,
                  text="Ширина GIF:").grid(row=row, column=0, sticky=tk.W, pady=10)
-        
-        width_frame = ttk.Frame(settings_grid)
-        width_frame.grid(row=row, column=1, sticky=tk.W, pady=10)
-        
-        width_slider = tk.Scale(width_frame,
-                               from_=200,
-                               to=800,
-                               variable=self.width,
-                               orient=tk.HORIZONTAL,
-                               length=200,
-                               bg=self.bg_color,
-                               fg=self.fg_color,
-                               troughcolor="#404040",
-                               highlightthickness=0)
-        width_slider.pack(side=tk.LEFT)
-        
-        width_label = tk.Label(width_frame,
-                              textvariable=self.width,
-                              bg=self.bg_color,
-                              fg=self.fg_color,
-                              width=4)
-        width_label.pack(side=tk.LEFT, padx=5)
-        tk.Label(width_frame,
-                text="px",
-                bg=self.bg_color,
-                fg=self.fg_color).pack(side=tk.LEFT)
+
+        width_info_frame = ttk.Frame(settings_grid)
+        width_info_frame.grid(row=row, column=1, sticky=tk.W, pady=10)
+
+        width_info_label = tk.Label(width_info_frame,
+                                   text="Автоматически определяется по входному файлу",
+                                   bg=self.bg_color,
+                                   fg=self.text_muted,
+                                   font=("Segoe UI", 9))
+        width_info_label.pack(side=tk.LEFT)
         
         # FPS
         row += 1
@@ -632,8 +621,8 @@ class DiscordGIFConverterGUI:
                     output_path=str(output_path),
                     start_time=start_time,
                     end_time=end_time,
-                    custom_fps=self.fps.get(),
-                    custom_width=self.width.get()
+                    custom_fps=self.fps.get()
+                    # custom_width автоматически определяется по входному файлу
                 )
                 
                 if success:
