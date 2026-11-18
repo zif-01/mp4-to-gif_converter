@@ -1,10 +1,13 @@
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, scrolledtext
-import tkinterdnd2 as tkdnd  # Для drag & drop
+try:
+    import tkinterdnd2 as tkdnd
+except ImportError:
+    tkdnd = None
 from pathlib import Path
 import threading
 import queue
-import time
+import math
 import os
 import sys
 
@@ -38,6 +41,7 @@ class DiscordGIFConverterGUI:
         # Статус конвертации
         self.converting = False
         self.converter = None
+        self.cancel_event = threading.Event()
         
         # Стили
         self.setup_styles()
@@ -421,6 +425,10 @@ class DiscordGIFConverterGUI:
     
     def setup_drag_drop(self):
         """Настройка drag & drop функциональности"""
+        if tkdnd is None:
+            self.log_message("⚠️ tkinterdnd2 не установлен; drag & drop отключен")
+            return
+
         try:
             self.root.drop_target_register(tkdnd.DND_FILES)
             self.root.dnd_bind('<<Drop>>', self.handle_drop)
@@ -541,22 +549,30 @@ class DiscordGIFConverterGUI:
     
     def parse_time(self, time_str):
         """Парсинг времени из строки (MM:SS или секунды)"""
+        time_str = time_str.strip()
         if not time_str:
             return None
-        
-        try:
-            if ':' in time_str:
-                parts = time_str.split(':')
-                if len(parts) == 2:
-                    minutes, seconds = map(int, parts)
-                    return minutes * 60 + seconds
-                elif len(parts) == 3:
-                    hours, minutes, seconds = map(int, parts)
-                    return hours * 3600 + minutes * 60 + seconds
+
+        if ':' in time_str:
+            parts = time_str.split(':')
+            if len(parts) == 2:
+                minutes, seconds = map(int, parts)
+                if minutes < 0 or not 0 <= seconds < 60:
+                    raise ValueError("Введите время в формате MM:SS.")
+                value = minutes * 60 + seconds
+            elif len(parts) == 3:
+                hours, minutes, seconds = map(int, parts)
+                if hours < 0 or not 0 <= minutes < 60 or not 0 <= seconds < 60:
+                    raise ValueError("Введите время в формате HH:MM:SS.")
+                value = hours * 3600 + minutes * 60 + seconds
             else:
-                return float(time_str)
-        except:
-            return None
+                raise ValueError("Используйте формат MM:SS или HH:MM:SS.")
+        else:
+            value = float(time_str)
+
+        if not math.isfinite(value) or value < 0:
+            raise ValueError("Время должно быть неотрицательным числом.")
+        return value
     
     def start_conversion(self):
         """Запуск конвертации"""
@@ -574,30 +590,50 @@ class DiscordGIFConverterGUI:
                                       f"Начать конвертацию {len(self.input_files)} файлов?"):
                 return
         
+        # Парсинг времени обрезки
+        try:
+            start_time = self.parse_time(self.trim_start.get())
+            end_time = self.parse_time(self.trim_end.get())
+        except ValueError as error:
+            messagebox.showerror("Некорректное время", str(error))
+            return
+
+        if end_time is not None and end_time <= (start_time or 0):
+            messagebox.showerror(
+                "Некорректный диапазон",
+                "Время окончания должно быть больше времени начала."
+            )
+            return
+
+        files = tuple(self.input_files)
+        settings = (
+            self.fps.get(),
+            self.optimize_level.get(),
+            self.output_folder.get()
+        )
+
         # Настройка интерфейса
         self.converting = True
+        self.cancel_event.clear()
         self.convert_btn.config(state=tk.DISABLED)
         self.stop_btn.config(state=tk.NORMAL)
         self.progress_var.set(0)
-        
-        # Парсинг времени обрезки
-        start_time = self.parse_time(self.trim_start.get())
-        end_time = self.parse_time(self.trim_end.get())
+        self.status_label.config(text="Конвертация выполняется")
         
         # Запуск в отдельном потоке
         thread = threading.Thread(
             target=self.convert_files_thread,
-            args=(self.input_files, start_time, end_time),
+            args=(files, start_time, end_time, *settings),
             daemon=True
         )
         thread.start()
     
-    def convert_files_thread(self, files, start_time, end_time):
+    def convert_files_thread(self, files, start_time, end_time, fps, optimize_level, output_folder):
         """Поток для конвертации файлов"""
         total_files = len(files)
         
         for i, file_path in enumerate(files, 1):
-            if not self.converting:
+            if self.cancel_event.is_set():
                 break
             
             # Обновление прогресса
@@ -608,12 +644,12 @@ class DiscordGIFConverterGUI:
             try:
                 # Создание конвертера
                 self.converter = DiscordGIFConverter(
-                    optimize_level=self.optimize_level.get()
+                    optimize_level=optimize_level
                 )
                 
                 # Генерация имени выходного файла
                 output_name = f"{Path(file_path).stem}_discord.gif"
-                output_path = Path(self.output_folder.get()) / output_name
+                output_path = Path(output_folder) / output_name
                 
                 # Конвертация
                 success, result = self.converter.convert_mp4_to_gif(
@@ -621,7 +657,7 @@ class DiscordGIFConverterGUI:
                     output_path=str(output_path),
                     start_time=start_time,
                     end_time=end_time,
-                    custom_fps=self.fps.get()
+                    custom_fps=fps
                     # custom_width автоматически определяется по входному файлу
                 )
                 
@@ -638,21 +674,26 @@ class DiscordGIFConverterGUI:
             self.message_queue.put(("progress", final_progress))
         
         # Завершение
-        self.message_queue.put(("complete", None))
+        self.message_queue.put(("complete", self.cancel_event.is_set()))
     
     def stop_conversion(self):
         """Остановка конвертации"""
         if self.converting:
-            self.converting = False
-            self.message_queue.put(("log", "\n⏹️ Конвертация остановлена пользователем"))
-            self.finish_conversion()
+            self.cancel_event.set()
+            self.stop_btn.config(state=tk.DISABLED)
+            self.status_label.config(text="Остановка после текущего файла")
+            self.message_queue.put(
+                ("log", "\n⏹️ Остановка после завершения текущего файла")
+            )
     
-    def finish_conversion(self):
+    def finish_conversion(self, cancelled=False):
         """Завершение конвертации"""
         self.converting = False
         self.convert_btn.config(state=tk.NORMAL)
         self.stop_btn.config(state=tk.DISABLED)
-        self.status_label.config(text="Конвертация завершена")
+        self.status_label.config(
+            text="Конвертация остановлена" if cancelled else "Конвертация завершена"
+        )
     
     def process_queue(self):
         """Обработка сообщений из очереди"""
@@ -665,12 +706,14 @@ class DiscordGIFConverterGUI:
                 elif msg_type == "log":
                     self.log_message(data)
                 elif msg_type == "complete":
-                    self.finish_conversion()
+                    self.finish_conversion(cancelled=data)
                     self.log_message("\n" + "="*50)
-                    self.log_message("🎉 Конвертация завершена!")
-                    
-                    if self.converting:  # Если не было остановки
-                        messagebox.showinfo("Готово", "Конвертация успешно завершена!")
+                    self.log_message(
+                        "⏹️ Конвертация остановлена" if data
+                        else "🎉 Конвертация завершена!"
+                    )
+                    if not data:
+                        messagebox.showinfo("Готово", "Конвертация завершена.")
         
         except queue.Empty:
             pass
@@ -727,8 +770,7 @@ class DiscordGIFConverterGUI:
 def main():
     """Основная функция запуска GUI"""
     try:
-        # Создание основного окна с поддержкой drag & drop
-        root = tkdnd.TkinterDnD.Tk()
+        root = tkdnd.TkinterDnD.Tk() if tkdnd else tk.Tk()
         
         # Настройка темы
         root.tk_setPalette(background='#2b2b2b', foreground='#ffffff')

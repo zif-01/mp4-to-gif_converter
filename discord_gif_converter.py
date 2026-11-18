@@ -1,6 +1,8 @@
 import os
 import sys
 import argparse
+import math
+import shutil
 from pathlib import Path
 from typing import Optional, Tuple
 import subprocess
@@ -32,6 +34,7 @@ class DiscordGIFConverter:
         
         # Проверка наличия ffmpeg
         self.ffmpeg_path = self._find_ffmpeg()
+        self.ffprobe_path = self._find_ffprobe()
         
     def _get_preset(self):
         """Получить настройки для текущего уровня оптимизации"""
@@ -39,32 +42,28 @@ class DiscordGIFConverter:
     
     def _find_ffmpeg(self) -> str:
         """Найти путь к ffmpeg"""
-        # Сначала проверяем PATH
+        ffmpeg_path = shutil.which('ffmpeg')
+        if ffmpeg_path:
+            return ffmpeg_path
+
         try:
-            subprocess.run(['ffmpeg', '-version'], 
-                          capture_output=True, 
-                          check=True)
-            return 'ffmpeg'
-        except:
-            # Проверяем imageio-ffmpeg
-            try:
-                import imageio_ffmpeg
-                return imageio_ffmpeg.get_ffmpeg_exe()
-            except:
-                # Ищем в возможных местах
-                possible_paths = [
-                    os.path.join(os.path.dirname(sys.executable), 'ffmpeg.exe'),
-                    os.path.join(os.path.dirname(sys.executable), 'Scripts', 'ffmpeg.exe'),
-                    'C:\\ffmpeg\\bin\\ffmpeg.exe',
-                    '/usr/local/bin/ffmpeg',
-                    '/usr/bin/ffmpeg'
-                ]
-                
-                for path in possible_paths:
-                    if os.path.exists(path):
-                        return path
-                
-                raise Exception("FFmpeg не найден. Установите ffmpeg и добавьте в PATH")
+            import imageio_ffmpeg
+        except ImportError as error:
+            raise RuntimeError(
+                "FFmpeg не найден. Установите FFmpeg или пакет imageio-ffmpeg."
+            ) from error
+
+        return imageio_ffmpeg.get_ffmpeg_exe()
+
+    def _find_ffprobe(self) -> Optional[str]:
+        """Найти ffprobe в PATH или рядом с используемым ffmpeg."""
+        ffprobe_path = shutil.which('ffprobe')
+        if ffprobe_path:
+            return ffprobe_path
+
+        executable = 'ffprobe.exe' if os.name == 'nt' else 'ffprobe'
+        candidate = Path(self.ffmpeg_path).with_name(executable)
+        return str(candidate) if candidate.is_file() else None
     
     def _check_file_size(self, filepath: str, max_size: int = None) -> bool:
         """Проверить размер файла"""
@@ -82,9 +81,13 @@ class DiscordGIFConverter:
     
     def _get_video_info(self, video_path: str) -> dict:
         """Получить информацию о видео с помощью ffprobe"""
+        if not self.ffprobe_path:
+            print("⚠️ ffprobe не найден; длительность будет ограничена настройками конвертера.")
+            return {'duration': 0, 'width': 0, 'height': 0, 'fps': 0, 'total_frames': 0}
+
         try:
             cmd = [
-                'ffprobe',
+                self.ffprobe_path,
                 '-v', 'quiet',
                 '-print_format', 'json',
                 '-show_format',
@@ -92,7 +95,7 @@ class DiscordGIFConverter:
                 video_path
             ]
             
-            result = subprocess.run(cmd, capture_output=True, text=True)
+            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
             info = json.loads(result.stdout)
             
             # Ищем видео поток
@@ -122,9 +125,33 @@ class DiscordGIFConverter:
                 'total_frames': int(duration * fps) if fps > 0 else 0
             }
             
-        except Exception as e:
+        except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError) as e:
             print(f"Ошибка получения информации о видео: {e}")
             return {'duration': 0, 'width': 0, 'height': 0, 'fps': 0, 'total_frames': 0}
+
+    def _resolve_clip(self, start_time: Optional[float], end_time: Optional[float],
+                      video_duration: float) -> Tuple[float, float]:
+        """Проверить и ограничить временной диапазон клипа."""
+        start = 0.0 if start_time is None else float(start_time)
+        if not math.isfinite(start) or start < 0:
+            raise ValueError("Время начала должно быть неотрицательным числом.")
+
+        if end_time is not None:
+            end = float(end_time)
+            if not math.isfinite(end) or end <= start:
+                raise ValueError("Время окончания должно быть больше времени начала.")
+        else:
+            end = start + self.DISCORD_MAX_DURATION
+
+        end = min(end, start + self.DISCORD_MAX_DURATION)
+        if video_duration > 0:
+            if start >= video_duration:
+                raise ValueError("Время начала находится за пределами видео.")
+            end = min(end, video_duration)
+
+        if end <= start:
+            raise ValueError("Выбранный временной диапазон пуст.")
+        return start, end - start
     
     def convert_mp4_to_gif(
         self,
@@ -150,6 +177,9 @@ class DiscordGIFConverter:
             Tuple[успех, путь к файлу]
         """
         try:
+            if not Path(input_path).is_file():
+                return False, f"Входной файл не найден: {input_path}"
+
             # Генерация имени выходного файла
             if output_path is None:
                 input_stem = Path(input_path).stem
@@ -159,25 +189,21 @@ class DiscordGIFConverter:
             print(f"📹 Анализ видео: {input_path}")
             video_info = self._get_video_info(input_path)
             duration = video_info['duration']
-            
-            # Обрезка для Discord
-            if duration > self.DISCORD_MAX_DURATION:
-                if end_time is None or end_time > self.DISCORD_MAX_DURATION:
-                    end_time = min(end_time or duration, self.DISCORD_MAX_DURATION)
-                    print(f"Видео обрезано до {end_time} секунд (лимит Discord)")
-            
-            # Обрезка по времени
-            if start_time is not None and end_time is not None:
-                if end_time - start_time > self.DISCORD_MAX_DURATION:
-                    end_time = start_time + self.DISCORD_MAX_DURATION
-                    print(f"Клип обрезан до {self.DISCORD_MAX_DURATION} секунд")
+
+            clip_start, clip_duration = self._resolve_clip(
+                start_time, end_time, duration
+            )
             
             # Получение настроек
             preset = self._get_preset()
-            fps = custom_fps or preset['fps']
+            fps = preset['fps'] if custom_fps is None else custom_fps
+            if fps <= 0:
+                raise ValueError("FPS должен быть положительным числом.")
 
             # Автоматическое определение ширины на основе входного файла
-            if custom_width:
+            if custom_width is not None:
+                if custom_width <= 0:
+                    raise ValueError("Ширина должна быть положительным числом.")
                 width = custom_width
             else:
                 # Используем ширину из пресета как максимальную ширину
@@ -191,101 +217,70 @@ class DiscordGIFConverter:
                     width = preset_width
 
             print(f"⚙️  Настройки конвертации:")
-            print(f"   • Длительность: {duration:.1f} сек")
+            duration_text = f"{duration:.1f} сек" if duration > 0 else "не определена"
+            print(f"   • Длительность: {duration_text}")
             print(f"   • Исходный FPS: {video_info['fps']:.1f}")
             print(f"   • Целевой FPS: {fps}")
             print(f"   • Ширина: {width}px (автоопределение)")
             
-            # Построение команды ffmpeg
-            cmd = [self.ffmpeg_path, '-y']
-            
-            # Добавляем временные ограничения
-            if start_time is not None:
-                cmd.extend(['-ss', str(start_time)])
-            
-            if end_time is not None and start_time is not None:
-                cmd.extend(['-t', str(end_time - start_time)])
-            elif end_time is not None:
-                cmd.extend(['-t', str(end_time)])
-            
-            # Основные параметры
-            cmd.extend([
-                '-i', input_path,
-                '-vf', f'fps={fps},scale={width}:-1:flags=lanczos',
-                '-gifflags', '+transdiff',
-                '-y'  # Перезаписать без подтверждения
-            ])
+            input_options = ['-ss', str(clip_start), '-t', str(clip_duration)]
             
             # Параметры палитры для лучшего качества
             with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp:
                 palette_path = tmp.name
-            
-            # Генерация палитры
-            palette_cmd = [
-                self.ffmpeg_path, '-y',
-                '-i', input_path
-            ]
-            
-            if start_time is not None:
-                palette_cmd.extend(['-ss', str(start_time)])
-            
-            if end_time is not None and start_time is not None:
-                palette_cmd.extend(['-t', str(end_time - start_time)])
-            
-            palette_cmd.extend([
-                '-vf', f'fps={fps},scale={width}:-1:flags=lanczos,palettegen',
-                palette_path
-            ])
-            
-            print("🎨 Генерация палитры цветов...")
-            result = subprocess.run(palette_cmd, 
-                                  capture_output=True, 
-                                  text=True,
-                                  creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0)
-            
-            if result.returncode != 0:
-                print(f"Ошибка генерации палитры: {result.stderr}")
-                # Пробуем без палитры
-                cmd.append(output_path)
-            else:
-                # Использование палитры с улучшенным дизерингом
-                preset = self._get_preset()
-                dither_method = preset.get('dither', 'floydsteinberg')
-                cmd.extend([
-                    '-i', palette_path,
-                    '-filter_complex', f'[0:v]fps={fps},scale={width}:-1:flags=lanczos[x];[x][1:v]paletteuse=dither={dither_method}',
-                    output_path
-                ])
-            
-            print("🔄 Конвертация MP4 → GIF...")
-            result = subprocess.run(cmd, 
-                                  capture_output=True, 
-                                  text=True,
-                                  creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0)
-            
-            # Удаление временного файла палитры
-            if os.path.exists(palette_path):
-                os.remove(palette_path)
-            
-            if result.returncode != 0:
-                print(f"❌ Ошибка конвертации: {result.stderr}")
-                
-                # Пробуем простую конвертацию без палитры
-                print("🔄 Попытка простой конвертации...")
-                simple_cmd = [
-                    self.ffmpeg_path, '-y',
-                    '-i', input_path,
-                    '-vf', f'fps={fps},scale={width}:-1',
-                    output_path
+            try:
+                print("🎨 Генерация палитры цветов...")
+                palette_cmd = [
+                    self.ffmpeg_path, '-y', *input_options, '-i', input_path,
+                    '-vf',
+                    f'fps={fps},scale={width}:-1:flags=lanczos,'
+                    f'palettegen=max_colors={preset["colors"]}',
+                    '-frames:v', '1', palette_path
                 ]
-                
-                result = subprocess.run(simple_cmd, 
-                                      capture_output=True, 
-                                      text=True,
-                                      creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0)
-                
+                result = subprocess.run(
+                    palette_cmd,
+                    capture_output=True,
+                    text=True,
+                    creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0
+                )
+
+                if result.returncode == 0:
+                    dither_method = preset.get('dither', 'floydsteinberg')
+                    cmd = [
+                        self.ffmpeg_path, '-y', *input_options, '-i', input_path,
+                        '-i', palette_path,
+                        '-filter_complex',
+                        f'[0:v]fps={fps},scale={width}:-1:flags=lanczos[x];'
+                        f'[x][1:v]paletteuse=dither={dither_method}',
+                        '-gifflags', '+transdiff', output_path
+                    ]
+                    result = subprocess.run(
+                        cmd,
+                        capture_output=True,
+                        text=True,
+                        creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0
+                    )
+
+                if result.returncode != 0:
+                    print(f"⚠️ Конвертация с палитрой не удалась: {result.stderr}")
+                    print("🔄 Попытка простой конвертации...")
+                    simple_cmd = [
+                        self.ffmpeg_path, '-y', *input_options, '-i', input_path,
+                        '-vf', f'fps={fps},scale={width}:-1:flags=lanczos',
+                        output_path
+                    ]
+                    result = subprocess.run(
+                        simple_cmd,
+                        capture_output=True,
+                        text=True,
+                        creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0
+                    )
+
                 if result.returncode != 0:
                     return False, f"Ошибка конвертации: {result.stderr}"
+            finally:
+                if os.path.exists(palette_path):
+                    os.remove(palette_path)
             
             # Оптимизация с помощью ImageMagick (если доступен)
             self._optimize_gif_imagemagick(output_path, preset)
@@ -294,12 +289,8 @@ class DiscordGIFConverter:
             if os.path.exists(output_path):
                 size_ok = self._check_file_size(output_path)
                 
-                if not size_ok and self.optimize_level < 2:
-                    print("🔄 Повторная конвертация с максимальной оптимизацией...")
-                    self.optimize_level = 2
-                    return self.convert_mp4_to_gif(
-                        input_path, output_path, start_time, end_time
-                    )
+                if not size_ok:
+                    print("⚠️ GIF создан, но превышает лимит размера Discord.")
                 
                 print(f"✅ Готово! GIF сохранен: {output_path}")
                 return True, output_path
@@ -414,7 +405,7 @@ class DiscordGIFConverter:
         print(f"\n📊 Итог: {successful}/{len(mp4_files)} успешно сконвертировано")
 
 
-def main():
+def main(argv=None):
     parser = argparse.ArgumentParser(description='Конвертер MP4 в GIF для Discord')
     parser.add_argument('input', help='Путь к MP4 файлу или папке')
     parser.add_argument('-o', '--output', help='Путь для сохранения GIF')
@@ -427,7 +418,7 @@ def main():
     parser.add_argument('-b', '--batch', action='store_true',
                        help='Пакетная конвертация всех MP4 в папке')
     
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     
     # Создание конвертера
     converter = DiscordGIFConverter(optimize_level=args.level)

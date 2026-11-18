@@ -11,12 +11,9 @@ echo.
 
 :: Проверяем requirements.txt
 if not exist "requirements.txt" (
-    echo Создаю requirements.txt...
-    echo numpy==1.24.3 > requirements.txt
-    echo pillow==10.2.0 >> requirements.txt
-    echo imageio==2.31.6 >> requirements.txt
-    echo imageio-ffmpeg==0.4.9 >> requirements.txt
-    echo tkinterdnd2==0.3.0 >> requirements.txt
+    echo Ошибка: requirements.txt не найден.
+    pause
+    exit /b 1
 )
 
 echo [1/6] Создание виртуального окружения...
@@ -84,11 +81,7 @@ for /f "usebackq tokens=*" %%p in ("%PACKAGES_FILE%") do (
 )
 
 echo.
-echo [4/6] Установка дополнительных пакетов для совместимости...
-:: Устанавливаем setuptools для tkinterdnd2
-python -m pip install setuptools --upgrade
-python -m pip install wheel
-
+echo [4/6] Повторная проверка неудавшихся пакетов...
 :: Пробуем еще раз установить неудавшиеся пакеты
 if not "!FAILED_PACKAGES!"=="" (
     echo.
@@ -125,6 +118,7 @@ echo [6/6] Проверка установки...
 :: Создаем проверочный скрипт
 echo import sys > check_install.py
 echo import subprocess >> check_install.py
+echo import imageio_ffmpeg >> check_install.py
 echo. >> check_install.py
 echo print("=" * 50) >> check_install.py
 echo print("Проверка установки Discord GIF Converter") >> check_install.py
@@ -132,7 +126,7 @@ echo print("=" * 50) >> check_install.py
 echo. >> check_install.py
 
 :: Проверяем каждый пакет
-echo packages_to_check = ["numpy", "PIL", "imageio", "tkinterdnd2"] >> check_install.py
+echo packages_to_check = ["imageio_ffmpeg"] >> check_install.py
 echo results = {} >> check_install.py
 echo. >> check_install.py
 echo for package in packages_to_check: >> check_install.py
@@ -159,13 +153,13 @@ echo. >> check_install.py
 :: Проверка FFmpeg
 echo print("\nПроверка FFmpeg:") >> check_install.py
 echo try: >> check_install.py
-echo     result = subprocess.run(['ffmpeg', '-version'], capture_output=True, text=True) >> check_install.py
+echo     result = subprocess.run([imageio_ffmpeg.get_ffmpeg_exe(), '-version'], capture_output=True, text=True) >> check_install.py
 echo     if result.returncode == 0: >> check_install.py
-echo         print("✅ FFmpeg найден в системе") >> check_install.py
+echo         print("✅ FFmpeg доступен") >> check_install.py
 echo     else: >> check_install.py
 echo         print("⚠️ FFmpeg не отвечает правильно") >> check_install.py
 echo except FileNotFoundError: >> check_install.py
-echo     print("❌ FFmpeg не найден! Установите FFmpeg из https://ffmpeg.org") >> check_install.py
+echo     print("❌ FFmpeg недоступен через imageio-ffmpeg") >> check_install.py
 echo. >> check_install.py
 
 echo print("=" * 50) >> check_install.py
@@ -182,21 +176,15 @@ del check_install.py
 
 echo.
 echo ========================================
-echo ИНСТРУКЦИЯ ПО УСТАНОВКЕ tkinterdnd2
+echo ОПЦИОНАЛЬНО: DRAG ^& DROP
 echo ========================================
-echo Если tkinterdnd2 не установился автоматически:
+echo Чтобы включить drag ^& drop в GUI:
 echo.
-echo 1. Установите вручную:
+echo Установите tkinterdnd2 в виртуальное окружение:
 echo    venv\Scripts\activate
 echo    pip install tkinterdnd2
 echo.
-echo 2. Или используйте альтернативу:
-echo    pip install tkinter-dnd
-echo.
-echo 3. Если не работает, можно отключить drag&drop:
-echo    - Отредактируйте gui_converter.py
-echo    - Удалите импорт tkinterdnd2
-echo    - Удалите все вызовы drop функций
+echo Без этого пакета GUI работает без drag ^& drop.
 echo ========================================
 echo.
 echo Файлы для запуска:
